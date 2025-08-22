@@ -44,32 +44,33 @@ def string_para_funcao(expressao: str):
     
     return f
 
-def encontrar_intervalo(f):
-    """Encontra automaticamente intervalo com troca de sinal"""
-    pontos_teste = [-10, -5, -3, -2, -1, -0.5, 0, 0.5, 1, 2, 3, 5, 10]
-    print("Procurando intervalo com troca de sinal...")
+def encontrar_intervalos(f, inicio=-10, fim=10, passo=0.5):
+    """Encontra todos os intervalos com troca de sinal dentro de um range"""
+    print("Procurando intervalos com troca de sinal...")
+    intervalos = []
+    x_atual = inicio
+    f_anterior = f(x_atual)
     
-    valores_validos = []
-    for x in pontos_teste:
-        try:
-            fx = f(x)
-            if not math.isnan(fx):
-                print(f"f({x:.2f}) = {fx:.6e}")
-                valores_validos.append((x, fx))
-        except:
+    while x_atual <= fim:
+        x_proximo = x_atual + passo
+        if x_proximo > fim:
+            break
+        f_atual = f(x_proximo)
+        
+        if math.isnan(f_anterior) or math.isnan(f_atual):
+            x_atual = x_proximo
+            f_anterior = f_atual
             continue
+        
+        if f_anterior * f_atual < 0:
+            intervalo = (x_atual, x_proximo)
+            intervalos.append(intervalo)
+            print(f"Troca de sinal encontrada entre {x_atual:.2f} e {x_proximo:.2f}")
+        
+        x_atual = x_proximo
+        f_anterior = f_atual
     
-    for i in range(len(valores_validos)):
-        x1, f1 = valores_validos[i]
-        for j in range(i+1, len(valores_validos)):
-            x2, f2 = valores_validos[j]
-            if f1 * f2 < 0:
-                print(f"\nTroca de sinal encontrada entre {x1:.2f} e {x2:.2f}")
-                print(f"f({x1:.2f}) = {f1:.6e}")
-                print(f"f({x2:.2f}) = {f2:.6e}")
-                return min(x1, x2), max(x1, x2)
-    
-    raise ValueError("Não foi possível encontrar intervalo com troca de sinal automaticamente.")
+    return intervalos
 
 # Solicitar a função do usuário
 funcao_str = input("\nDigite a função f(x) (use 'x' como variável, ex: x**2 - 2): ")
@@ -81,16 +82,14 @@ print(f"Expressão convertida: {funcao_str_convertida}")
 # Criar função matemática
 funcao = string_para_funcao(funcao_str_convertida)
 
-# Testar a função
-print("\nTestando função em vários pontos:")
-try:
-    a, b = encontrar_intervalo(funcao)
-    print(f"\nUsando intervalo automático: [{a:.2f}, {b:.2f}]")
-except ValueError as e:
-    print(e)
-    print("\nPor favor, insira manualmente um intervalo onde a função troca de sinal.")
+# Encontrar todos os intervalos com troca de sinal
+intervalos = encontrar_intervalos(funcao)
+
+if not intervalos:
+    print("Nenhum intervalo com troca de sinal encontrado. Insira manualmente.")
     a = float(input("Digite o valor inicial do intervalo (a): "))
     b = float(input("Digite o valor final do intervalo (b): "))
+    intervalos = [(a, b)]
 
 # Derivada numérica
 def derivada(x, h=1e-5):
@@ -121,7 +120,6 @@ def bissecao_newton_raphson(a, b):
     iteracao = 0
 
     # Fase de Bissecção
-    print("\nFase de Bissecção:")
     while iteracao < MAX_ITER_BISSEC:
         c = (a + b) / 2
         fc = funcao(c)
@@ -178,12 +176,46 @@ def bissecao_newton_raphson(a, b):
     print(f"\nTotal de iterações: {iteracao + newton_iter}")
     return x
 
-# Executar o método
-print("\nIniciando cálculo da raiz...")
-raiz = bissecao_newton_raphson(a, b)
+# Encontrar e exibir todas as raízes
+raizes = []
+tolerancia_raiz = 1e-5
 
-if raiz is not None:
-    print(f"\nRaiz aproximada: {raiz:.16e}")
-    print(f"Valor da função na raiz: {funcao(raiz):.4e}")
+for a, b in intervalos:
+    print(f"\nCalculando raiz no intervalo [{a}, {b}]")
+    raiz = bissecao_newton_raphson(a, b)
+    
+    if raiz is not None:
+        # Verificar se a raiz já foi encontrada
+        if not any(abs(raiz - r) < tolerancia_raiz for r in raizes):
+            raizes.append(raiz)
+            print(f"Raiz encontrada: {raiz:.16e}")
+        else:
+            print(f"Raiz duplicada ignorada: {raiz:.16e}")
+    else:
+        print("Não foi possível encontrar uma raiz neste intervalo.")
+
+# Exibir resumo completo de todas as raízes encontradas
+print("\n" + "="*60)
+print("RESUMO DAS RAÍZES ENCONTRADAS")
+print("="*60)
+
+if raizes:
+    raizes_ordenadas = sorted(raizes)
+    for i, raiz in enumerate(raizes_ordenadas, 1):
+        valor_funcao = funcao(raiz)
+        print(f"Raiz {i}: x = {raiz:.16e}")
+        print(f"         f(x) = {valor_funcao:.4e}")
+        print(f"         Intervalo inicial: [{next((a for a, b in intervalos if min(a, b) <= raiz <= max(a, b)), 'N/A'):.2f}, " +
+              f"{next((b for a, b in intervalos if min(a, b) <= raiz <= max(a, b)), 'N/A'):.2f}]")
+        print("-" * 40)
+    
+    print(f"\nTotal de raízes distintas encontradas: {len(raizes)}")
+    
+    # Verificar se todas as raízes são válidas (f(x) próximo de zero)
+    raizes_validas = [raiz for raiz in raizes if abs(funcao(raiz)) < 1e-10]
+    print(f"Raízes válidas (|f(x)| < 1e-10): {len(raizes_validas)}")
+    
 else:
-    print("\nNão foi possível encontrar uma raiz no intervalo fornecido.")
+    print("Nenhuma raiz encontrada nos intervalos fornecidos.")
+
+print("="*60)
